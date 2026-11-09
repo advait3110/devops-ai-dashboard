@@ -8,7 +8,7 @@
 #   docker compose down                                stop everything
 #
 # Memory limits keep the whole stack comfortable on an 8 GB laptop.
-# Open: http://localhost:8080  (dashboard)   http://localhost:9090 (Prometheus)
+# Open: http://localhost:8088  (dashboard)   http://localhost:9090 (Prometheus)
 #       http://localhost:3000  (Grafana, admin / admin on first login)
 # =====================================================================
 
@@ -33,7 +33,7 @@ services:
       # profile runs. Inside compose, Prometheus is reached by its service name.
       PROMETHEUS_URL: ${PROMETHEUS_URL:-}
       GRAFANA_URL: ${GRAFANA_URL:-}
-      CORS_ORIGINS: http://localhost:8080
+      CORS_ORIGINS: http://localhost:8088
     volumes:
       - backend-data:/app/data
       - backend-logs:/app/logs
@@ -58,7 +58,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "8080:80"
+      - "8088:80"
     restart: unless-stopped
     deploy:
       resources:
