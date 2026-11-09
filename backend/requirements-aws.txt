@@ -1,0 +1,3 @@
+# Optional - only needed when AWS_ENABLED=true
+-r requirements.txt
+boto3>=1.35

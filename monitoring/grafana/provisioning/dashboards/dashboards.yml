@@ -1,0 +1,10 @@
+# Loads every dashboard JSON file from /var/lib/grafana/dashboards.
+apiVersion: 1
+providers:
+  - name: devops-ai
+    folder: DevOps AI
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 60
+    options:
+      path: /var/lib/grafana/dashboards

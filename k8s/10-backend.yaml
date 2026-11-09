@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-backend
+  namespace: devops-ai
+  labels: { app: devops-backend }
+spec:
+  replicas: 1   # one replica: alert state + metric history live in this process
+  selector:
+    matchLabels: { app: devops-backend }
+  template:
+    metadata:
+      labels: { app: devops-backend }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: devops-ai-backend
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: backend
+          image: devops-ai-backend:latest
+          imagePullPolicy: IfNotPresent   # image is built inside minikube, not pulled
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: { name: devops-ai-config }
+            - secretRef: { name: devops-ai-secrets, optional: true }
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: 8000 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - { name: data, mountPath: /app/data }
+            - { name: logs, mountPath: /app/logs }
+          securityContext:
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+---
+# Service name "backend" matches proxy_pass http://backend:8000 in nginx.conf
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: devops-ai
+spec:
+  selector: { app: devops-backend }
+  ports:
+    - port: 8000
+      targetPort: 8000

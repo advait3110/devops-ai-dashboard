@@ -1,0 +1,165 @@
+# =====================================================================
+# DevOps AI Dashboard - Docker Compose
+#
+#   docker compose up -d --build                       app only  (~200 MB RAM)
+#   docker compose --profile monitoring up -d --build  + Prometheus, Grafana,
+#                                                        node-exporter (~+450 MB)
+#   docker compose --profile ci up -d --build jenkins  Jenkins on :8081 (~700 MB)
+#   docker compose down                                stop everything
+#
+# Memory limits keep the whole stack comfortable on an 8 GB laptop.
+# Open: http://localhost:8080  (dashboard)   http://localhost:9090 (Prometheus)
+#       http://localhost:3000  (Grafana, admin / admin on first login)
+# =====================================================================
+
+name: devops-ai
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+      args:
+        INSTALL_AWS: ${INSTALL_AWS:-false}
+    image: devops-ai-backend:latest
+    container_name: devops-backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      APP_ENV: docker
+      DOCKER_ENABLED: "true"
+      # Set these in the root .env file (see .env.example) when the monitoring
+      # profile runs. Inside compose, Prometheus is reached by its service name.
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-}
+      GRAFANA_URL: ${GRAFANA_URL:-}
+      CORS_ORIGINS: http://localhost:8080
+    volumes:
+      - backend-data:/app/data
+      - backend-logs:/app/logs
+      # Gives the Docker module access to the Docker Engine API (read + start/stop).
+      # Remove this line to run without Docker monitoring.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # The socket belongs to group "root" (0) on Docker Desktop and "docker" on Linux;
+    # adding gid 0 lets the non-root app user read it. On Linux set DOCKER_GID=$(getent group docker | cut -d: -f3)
+    group_add:
+      - "${DOCKER_GID:-0}"
+    ports:
+      - "8000:8000"   # API + /docs; also scraped by Prometheus at backend:8000/metrics
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 256M }
+
+  frontend:
+    build: ./frontend
+    image: devops-ai-frontend:latest
+    container_name: devops-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 64M }
+
+  # ------------------------- monitoring profile -------------------------
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    profiles: ["monitoring"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=3d     # small disk footprint
+      - --web.enable-lifecycle               # allows POST /-/reload after config edits
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets Prometheus scrape exporters on your host
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 384M }
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    container_name: node-exporter
+    profiles: ["monitoring"]
+    command:
+      - --path.rootfs=/host
+      - --collector.disable-defaults
+      - --collector.cpu
+      - --collector.meminfo
+      - --collector.filesystem
+      - --collector.netdev
+      - --collector.loadavg
+      - --collector.diskstats
+      - --collector.uname
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.20", memory: 48M }
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    container_name: grafana
+    profiles: ["monitoring"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Allow the dashboard to be embedded (Infrastructure page) and viewed read-only.
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "0.50", memory: 256M }
+
+  # ------------------------------ ci profile ------------------------------
+  # docker compose --profile ci up -d --build jenkins   (see jenkins/README.md)
+  jenkins:
+    build: ./jenkins
+    image: devops-ai-jenkins:latest
+    container_name: jenkins
+    profiles: ["ci"]
+    user: jenkins
+    group_add:
+      - "${DOCKER_GID:-0}"
+    environment:
+      JAVA_OPTS: -Xmx512m -Djenkins.install.runSetupWizard=true
+    ports:
+      - "8081:8080"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 900M }
+
+volumes:
+  jenkins-home:
+  backend-data:
+  backend-logs:
+  prometheus-data:
+  grafana-data:

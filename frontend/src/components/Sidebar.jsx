@@ -1,80 +1,74 @@
-import { LayoutDashboard, Bot, Rocket, Boxes, Activity } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { useState } from "react";
+import { PAGES } from "../navigation";
 
-function Sidebar({
-  activePage,
+export default function Sidebar({ active, onNavigate, alertSummary, host }) {
+  const [open, setOpen] = useState(false);
+  const firing = alertSummary?.firing || 0;
+  const critical = alertSummary?.critical || 0;
 
-  setActivePage,
-}) {
+  const go = (id) => {
+    onNavigate(id);
+    setOpen(false);
+  };
+
   return (
-    <div className="sidebar">
-      <div>
-        <h1 className="logo">DevOps AI</h1>
-
-        <div className="nav-links">
-          <div
-            className={
-              activePage === "dashboard" ? "nav-item active" : "nav-item"
-            }
-            onClick={() => setActivePage("dashboard")}
-          >
-            <LayoutDashboard size={22} />
-
-            <span>Dashboard</span>
-          </div>
-
-          <div
-            className={
-              activePage === "assistant" ? "nav-item active" : "nav-item"
-            }
-            onClick={() => setActivePage("assistant")}
-          >
-            <Bot size={22} />
-
-            <span>AI Assistant</span>
-          </div>
-
-          <div
-            className={
-              activePage === "deployments" ? "nav-item active" : "nav-item"
-            }
-            onClick={() => setActivePage("deployments")}
-          >
-            <Rocket size={22} />
-
-            <span>Deployments</span>
-          </div>
-
-          <div
-            className={
-              activePage === "kubernetes" ? "nav-item active" : "nav-item"
-            }
-            onClick={() => setActivePage("kubernetes")}
-          >
-            <Boxes size={22} />
-
-            <span>Kubernetes</span>
-          </div>
-
-          <div
-            className={
-              activePage === "monitoring" ? "nav-item active" : "nav-item"
-            }
-            onClick={() => setActivePage("monitoring")}
-          >
-            <Activity size={22} />
-
-            <span>Monitoring</span>
+    <>
+      <div className="mobile-bar">
+        <button className="btn ghost icon" onClick={() => setOpen(!open)} aria-label="Toggle navigation">
+          {open ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <span className="brand-name">DevOps AI</span>
+      </div>
+      <nav className={`sidebar ${open ? "open" : ""}`} aria-label="Main">
+        <div className="brand">
+          <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+            <rect width="32" height="32" rx="7" fill="#16233a" />
+            <polyline
+              points="4,19 10,19 13,9 18,25 21,15 28,15"
+              fill="none"
+              stroke="#34c79a"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <div>
+            <div className="brand-name">DevOps AI</div>
+            <div className="brand-host">{host || "connecting…"}</div>
           </div>
         </div>
-      </div>
 
-      <div className="cluster-box">
-        <h3>Cluster Status</h3>
+        <ul className="nav">
+          {PAGES.map(({ id, label, icon: Icon }) => (
+            <li key={id}>
+              <a
+                href={`#/${id}`}
+                className={`nav-item ${active === id ? "active" : ""}`}
+                aria-current={active === id ? "page" : undefined}
+                onClick={(e) => {
+                  e.preventDefault();
+                  go(id);
+                }}
+              >
+                <Icon size={18} />
+                <span>{label}</span>
+                {id === "alerts" && firing > 0 && (
+                  <span className={`nav-badge ${critical ? "crit" : "warn"}`}>{firing}</span>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
 
-        <p>Healthy</p>
-      </div>
-    </div>
+        <div className={`health-card ${critical ? "crit" : firing ? "warn" : "ok"}`}>
+          <span className="dot" />
+          <div>
+            <strong>{critical ? "Critical issues" : firing ? "Needs attention" : "All quiet"}</strong>
+            <p>{firing ? `${firing} alert${firing > 1 ? "s" : ""} firing` : "No alerts firing"}</p>
+          </div>
+        </div>
+      </nav>
+    </>
   );
 }
-
-export default Sidebar;

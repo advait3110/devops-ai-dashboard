@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-frontend
+  namespace: devops-ai
+  labels: { app: devops-frontend }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: devops-frontend }
+  template:
+    metadata:
+      labels: { app: devops-frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: devops-ai-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 200m, memory: 64Mi }
+          readinessProbe:
+            httpGet: { path: /nginx-health, port: 80 }
+            periodSeconds: 10
+---
+# NodePort exposes the UI outside the cluster:  minikube service devops-frontend -n devops-ai
+apiVersion: v1
+kind: Service
+metadata:
+  name: devops-frontend
+  namespace: devops-ai
+spec:
+  type: NodePort
+  selector: { app: devops-frontend }
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080

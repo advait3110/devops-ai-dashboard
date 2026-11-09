@@ -1,0 +1,19 @@
+# Non-secret configuration (same variable names as backend/.env).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-ai-config
+  namespace: devops-ai
+data:
+  APP_ENV: kubernetes
+  KUBERNETES_ENABLED: "true"
+  DOCKER_ENABLED: "false"
+  ALLOW_ACTIONS: "true"
+  SAMPLE_INTERVAL: "5"
+  INTEGRATION_POLL_INTERVAL: "60"
+  GEMINI_MODEL: gemini-3.8-flash
+  GEMINI_FALLBACK_MODEL: gemini-3.5-flash-lite
+  CORS_ORIGINS: http://localhost:8080
+  # Uncomment if Prometheus runs in the cluster or on the host:
+  # PROMETHEUS_URL: http://host.minikube.internal:9090
+  # GITHUB_REPOS: your-user/devops-ai-dashboard

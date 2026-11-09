@@ -1,0 +1,71 @@
+#!/bin/bash
+# =====================================================================
+# First-boot script (cloud-init user-data) for Amazon Linux 2023.
+# Installs Docker, clones the project and starts it with Docker Compose.
+# Rendered by Terraform templatefile(): template variables are filled in by terraform/main.tf.
+# Progress log: /var/log/devops-ai-setup.log
+# =====================================================================
+set -euo pipefail
+exec > >(tee -a /var/log/devops-ai-setup.log) 2>&1
+echo "=== DevOps AI setup started $(date) ==="
+
+# 1) 2 GB swap: a 1 GB t3.micro needs it to build the frontend image.
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=2048
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+fi
+
+# 2) Docker + Compose/Buildx plugins, git, cron
+dnf install -y docker git cronie
+systemctl enable --now docker crond
+usermod -aG docker ec2-user
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+curl -fsSL "https://github.com/docker/buildx/releases/download/v0.25.0/buildx-v0.25.0.linux-amd64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+chmod +x /usr/local/lib/docker/cli-plugins/*
+docker compose version
+
+# 3) Project code
+APP_DIR=/opt/devops-ai
+if [ ! -d "$APP_DIR/.git" ]; then
+  git clone --branch "${repo_branch}" --depth 1 "${repo_url}" "$APP_DIR"
+fi
+cd "$APP_DIR"
+
+# 4) Configuration. The Gemini key comes from SSM Parameter Store (encrypted),
+#    using the instance's IAM role - no secret is stored in this script.
+GEMINI_KEY=$(aws ssm get-parameter --region "${region}" --name "${gemini_param}" \
+  --with-decryption --query Parameter.Value --output text || echo "")
+[ "$GEMINI_KEY" = "not-set" ] && GEMINI_KEY=""
+
+cat > backend/.env <<ENV
+APP_ENV=aws
+GEMINI_API_KEY=$GEMINI_KEY
+DOCKER_ENABLED=true
+AWS_ENABLED=true
+AWS_REGION=${region}
+ENV
+chmod 600 backend/.env
+
+# 5) Start the stack
+export INSTALL_AWS=true
+export DOCKER_GID=$(getent group docker | cut -d: -f3)
+%{ if enable_monitoring ~}
+export PROMETHEUS_URL="http://prometheus:9090"
+export GRAFANA_URL="http://$(curl -s -H "X-aws-ec2-metadata-token: $(curl -s -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" http://169.254.169.254/latest/meta-data/public-ipv4):3000"
+docker compose --profile monitoring up -d --build
+%{ else ~}
+docker compose up -d --build
+%{ endif ~}
+
+# 6) Nightly backup of the alert database to S3 (02:30 server time)
+cat > /etc/cron.d/devops-ai-backup <<CRON
+30 2 * * * root docker cp devops-backend:/app/data/alerts.db /tmp/alerts.db && aws s3 cp /tmp/alerts.db s3://${backup_bucket}/alerts/\$(date +\%F).db --region ${region}
+CRON
+
+echo "=== DevOps AI setup finished $(date) ==="

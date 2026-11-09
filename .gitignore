@@ -1,0 +1,30 @@
+# Python
+backend/venv/
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Secrets & runtime data
+.env
+backend/data/
+backend/logs/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/tfplan
+terraform/.terraform.lock.hcl
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
