@@ -45,7 +45,7 @@ services:
     group_add:
       - "${DOCKER_GID:-0}"
     ports:
-      - "8000:8000"   # API + /docs; also scraped by Prometheus at backend:8000/metrics
+      - "8000:8000" # API + /docs; also scraped by Prometheus at backend:8000/metrics
     restart: unless-stopped
     deploy:
       resources:
@@ -72,15 +72,15 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=3d     # small disk footprint
-      - --web.enable-lifecycle               # allows POST /-/reload after config edits
+      - --storage.tsdb.retention.time=3d # small disk footprint
+      - --web.enable-lifecycle # allows POST /-/reload after config edits
     volumes:
       - ./monitoring/prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
     ports:
       - "9090:9090"
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # lets Prometheus scrape exporters on your host
+      - "host.docker.internal:host-gateway" # lets Prometheus scrape exporters on your host
     restart: unless-stopped
     deploy:
       resources:
@@ -102,7 +102,7 @@ services:
       - --collector.uname
     pid: host
     volumes:
-      - /:/host:ro,rslave
+      - /:/host:ro
     restart: unless-stopped
     deploy:
       resources:
