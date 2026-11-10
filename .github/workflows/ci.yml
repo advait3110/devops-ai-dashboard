@@ -52,6 +52,20 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  terraform:
+    name: Terraform validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      # No AWS credentials needed: init without a backend, then check syntax,
+      # references and the user-data template variables.
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
   docker:
     name: Docker images
     needs: [backend, frontend]

@@ -6,7 +6,7 @@ boto3 does not need to be installed and costs no RAM.
 
 Credentials come from the standard AWS chain (never from our code):
   1. environment variables AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
-  2. ~/.aws/credentials created by 'aws configure'
+  2. ~/.aws/credentials (profile chosen by AWS_PROFILE; created by aws_setup.py)
   3. the IAM role attached to the EC2 instance (created by terraform/)
 Use a read-only IAM policy (see terraform/iam.tf).
 """
@@ -20,8 +20,8 @@ from typing import Any
 from ..errors import IntegrationError, status_payload
 from ..utils.cache import ttl_cache
 
-HINT = ("pip install -r requirements-aws.txt, run 'aws configure' with a read-only IAM user, "
-        "then set AWS_ENABLED=true and AWS_REGION in backend/.env.")
+HINT = ("pip install -r requirements-aws.txt, then run 'python aws_setup.py' with the IAM user's "
+        "access-key CSV in Downloads (sets AWS_ENABLED, AWS_REGION, AWS_PROFILE in backend/.env).")
 
 
 class AWSService:

@@ -13,6 +13,15 @@ data "aws_ssm_parameter" "al2023" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 }
 
+# The public site name: your own domain if given, otherwise the Elastic IP itself
+# (Let's Encrypt issues free certificates for IP addresses since 2026).
+locals {
+  public_ip   = aws_eip.dashboard.public_ip
+  site_host   = var.domain_name != "" ? var.domain_name : local.public_ip
+  site_url    = "https://${local.site_host}"
+  github_repo = trimsuffix(trimprefix(var.repo_url, "https://github.com/"), ".git")
+}
+
 resource "aws_key_pair" "this" {
   key_name   = "${var.project}-key"
   public_key = file(pathexpand(var.ssh_public_key_path))
@@ -20,7 +29,7 @@ resource "aws_key_pair" "this" {
 
 resource "aws_security_group" "dashboard" {
   name        = "${var.project}-sg"
-  description = "DevOps AI Dashboard: SSH and web only from the owner's IP"
+  description = "DevOps AI Dashboard: public HTTPS site, SSH only from the owner's IP"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
@@ -31,12 +40,23 @@ resource "aws_security_group" "dashboard" {
     cidr_blocks = [var.allowed_cidr]
   }
 
+  # Ports 80 and 443 are open to everyone: this is the public website (Caddy).
+  # Let's Encrypt also needs them to verify the server before issuing the certificate.
+  # Caddy asks every visitor for the site password; the app's own port 8088 stays closed.
   ingress {
-    description = "Dashboard (Nginx)"
-    from_port   = 8080
-    to_port     = 8080
+    description = "HTTP (redirects to HTTPS, certificate validation)"
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = [var.allowed_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS website"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   dynamic "ingress" {
@@ -85,6 +105,13 @@ resource "aws_instance" "dashboard" {
     repo_branch       = var.repo_branch
     region            = var.region
     gemini_param      = aws_ssm_parameter.gemini_key.name
+    github_param      = aws_ssm_parameter.github_token.name
+    password_param    = aws_ssm_parameter.site_password.name
+    github_repo       = local.github_repo
+    site_host         = local.site_host
+    site_url          = local.site_url
+    site_username     = var.site_username
+    ip_mode           = var.domain_name == ""
     backup_bucket     = aws_s3_bucket.backups.bucket
     enable_monitoring = var.enable_monitoring_stack
   })
@@ -95,8 +122,14 @@ resource "aws_instance" "dashboard" {
   }
 }
 
+# The Elastic IP is created BEFORE the instance (and attached afterwards), so its
+# address is known when the first-boot script is rendered - Caddy needs it for HTTPS.
 resource "aws_eip" "dashboard" {
-  instance = aws_instance.dashboard.id
-  domain   = "vpc"
-  tags     = { Name = "${var.project}-ip" }
+  domain = "vpc"
+  tags   = { Name = "${var.project}-ip" }
+}
+
+resource "aws_eip_association" "dashboard" {
+  instance_id   = aws_instance.dashboard.id
+  allocation_id = aws_eip.dashboard.id
 }

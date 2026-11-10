@@ -1,7 +1,8 @@
 #!/bin/bash
 # =====================================================================
 # First-boot script (cloud-init user-data) for Amazon Linux 2023.
-# Installs Docker, clones the project and starts it with Docker Compose.
+# Installs Docker, clones the project, starts it with Docker Compose and
+# puts Caddy in front of it as the public HTTPS website.
 # Rendered by Terraform templatefile(): template variables are filled in by terraform/main.tf.
 # Progress log: /var/log/devops-ai-setup.log
 # =====================================================================
@@ -37,11 +38,18 @@ if [ ! -d "$APP_DIR/.git" ]; then
 fi
 cd "$APP_DIR"
 
-# 4) Configuration. The Gemini key comes from SSM Parameter Store (encrypted),
-#    using the instance's IAM role - no secret is stored in this script.
-GEMINI_KEY=$(aws ssm get-parameter --region "${region}" --name "${gemini_param}" \
-  --with-decryption --query Parameter.Value --output text || echo "")
-[ "$GEMINI_KEY" = "not-set" ] && GEMINI_KEY=""
+# 4) Configuration. Secrets come from SSM Parameter Store (encrypted), read
+#    with the instance's IAM role - no secret is stored in this script.
+get_secret() {
+  local value
+  value=$(aws ssm get-parameter --region "${region}" --name "$1" \
+    --with-decryption --query Parameter.Value --output text || echo "")
+  [ "$value" = "not-set" ] && value=""
+  echo "$value"
+}
+GEMINI_KEY=$(get_secret "${gemini_param}")
+GITHUB_TOKEN=$(get_secret "${github_param}")
+SITE_PASSWORD=$(get_secret "${password_param}")
 
 cat > backend/.env <<ENV
 APP_ENV=aws
@@ -49,23 +57,87 @@ GEMINI_API_KEY=$GEMINI_KEY
 DOCKER_ENABLED=true
 AWS_ENABLED=true
 AWS_REGION=${region}
+GITHUB_REPOS=${github_repo}
+GITHUB_TOKEN=$GITHUB_TOKEN
 ENV
 chmod 600 backend/.env
 
-# 5) Start the stack
+# 5) Public HTTPS website: Caddy gets a free Let's Encrypt certificate by itself,
+#    redirects http:// to https:// and asks every visitor for the site password.
+#    It forwards to the dashboard's Nginx on 127.0.0.1:8088 (closed to the internet).
+mkdir -p /opt/caddy
+CADDY_IMAGE=caddy:2.11-alpine
+docker pull "$CADDY_IMAGE"
+PASSWORD_HASH=$(docker run --rm "$CADDY_IMAGE" caddy hash-password --plaintext "$SITE_PASSWORD")
+unset SITE_PASSWORD
+
+cat > /opt/caddy/Caddyfile <<CADDY
+%{ if ip_mode ~}
+{
+	# Browsers send no server name (SNI) when the URL is an IP address.
+	default_sni ${site_host}
+}
+
+%{ endif ~}
+${site_host} {
+%{ if ip_mode ~}
+	# Let's Encrypt issues IP-address certificates only with the 6-day "shortlived" profile;
+	# Caddy renews them automatically.
+	tls {
+		issuer acme {
+			profile shortlived
+		}
+	}
+
+%{ endif ~}
+	# Everything needs the login except Grafana's health check (used by the backend).
+	@needs_login not path /grafana/api/health
+	basic_auth @needs_login {
+		${site_username} $PASSWORD_HASH
+	}
+
+	handle /grafana/* {
+		reverse_proxy 127.0.0.1:3000 {
+			# The browser's site login must not be mistaken for a Grafana login.
+			header_up -Authorization
+		}
+	}
+	redir /grafana /grafana/
+
+	handle {
+		reverse_proxy 127.0.0.1:8088
+	}
+}
+CADDY
+chmod 600 /opt/caddy/Caddyfile
+
+docker run -d --name caddy --restart unless-stopped --network host \
+  -v /opt/caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -v caddy-data:/data -v caddy-config:/config \
+  "$CADDY_IMAGE"
+
+# 6) Start the stack
 export INSTALL_AWS=true
 export DOCKER_GID=$(getent group docker | cut -d: -f3)
 %{ if enable_monitoring ~}
+# Grafana is served by Caddy under https://<site>/grafana/ so it can be embedded in the HTTPS page.
+cat > docker-compose.override.yml <<OVERRIDE
+services:
+  grafana:
+    environment:
+      GF_SERVER_ROOT_URL: ${site_url}/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+OVERRIDE
 export PROMETHEUS_URL="http://prometheus:9090"
-export GRAFANA_URL="http://$(curl -s -H "X-aws-ec2-metadata-token: $(curl -s -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" http://169.254.169.254/latest/meta-data/public-ipv4):3000"
+export GRAFANA_URL="${site_url}/grafana"
 docker compose --profile monitoring up -d --build
 %{ else ~}
 docker compose up -d --build
 %{ endif ~}
 
-# 6) Nightly backup of the alert database to S3 (02:30 server time)
+# 7) Nightly backup of the alert database to S3 (02:30 server time)
 cat > /etc/cron.d/devops-ai-backup <<CRON
 30 2 * * * root docker cp devops-backend:/app/data/alerts.db /tmp/alerts.db && aws s3 cp /tmp/alerts.db s3://${backup_bucket}/alerts/\$(date +\%F).db --region ${region}
 CRON
 
-echo "=== DevOps AI setup finished $(date) ==="
+echo "=== DevOps AI setup finished $(date): open ${site_url} ==="

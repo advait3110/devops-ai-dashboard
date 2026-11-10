@@ -17,7 +17,7 @@ variable "instance_type" {
 }
 
 variable "allowed_cidr" {
-  description = "Your public IP in CIDR form, e.g. 203.0.113.10/32. Only this address can reach SSH and the dashboard."
+  description = "Your public IP in CIDR form, e.g. 203.0.113.10/32. Only this address can reach SSH (and Grafana/Prometheus)."
   type        = string
 
   validation {
@@ -48,6 +48,36 @@ variable "gemini_api_key" {
   type        = string
   sensitive   = true
   default     = ""
+}
+
+variable "github_token" {
+  description = "Optional GitHub token (Actions: read) so the cloud dashboard shows your pipelines - stored encrypted in SSM"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "domain_name" {
+  description = "Optional domain pointing at the Elastic IP (e.g. myname.duckdns.org). Empty = HTTPS directly on the IP address."
+  type        = string
+  default     = ""
+}
+
+variable "site_username" {
+  description = "Login name for the public website (HTTP basic auth in Caddy)"
+  type        = string
+  default     = "admin"
+}
+
+variable "site_password" {
+  description = "Password for the public website - stored encrypted in SSM, hashed with bcrypt on the server"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.site_password) >= 8
+    error_message = "site_password must be at least 8 characters."
+  }
 }
 
 variable "enable_monitoring_stack" {

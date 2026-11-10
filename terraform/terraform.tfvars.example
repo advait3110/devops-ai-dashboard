@@ -1,10 +1,17 @@
 # Copy to terraform.tfvars (git-ignored) and edit.
 region              = "ap-south-1"
 instance_type       = "t3.micro"            # use t3.small with enable_monitoring_stack = true
-allowed_cidr        = "203.0.113.10/32"     # your public IP: curl https://checkip.amazonaws.com
+allowed_cidr        = "203.0.113.10/32"     # your public IP for SSH: curl https://checkip.amazonaws.com
 ssh_public_key_path = "~/.ssh/id_ed25519.pub"
 repo_url            = "https://github.com/your-user/devops-ai-dashboard.git"
 repo_branch         = "main"
 gemini_api_key      = "paste-your-key"
+github_token        = ""                    # optional: shows your GitHub Actions runs on the cloud dashboard
+
+# Public website: https://<elastic-ip> (or https://<domain_name>), protected by this login.
+site_username = "admin"
+site_password = "choose-a-strong-password"  # at least 8 characters
+domain_name   = ""                          # optional, e.g. "myname.duckdns.org" pointing at the Elastic IP
+
 enable_monitoring_stack = false
-alarm_email         = ""
+alarm_email             = ""

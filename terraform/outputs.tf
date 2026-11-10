@@ -1,18 +1,23 @@
 output "public_ip" {
   description = "Elastic IP of the dashboard server"
-  value       = aws_eip.dashboard.public_ip
+  value       = local.public_ip
 }
 
 output "dashboard_url" {
-  value = "http://${aws_eip.dashboard.public_ip}:8080"
+  description = "Public HTTPS website (log in with site_username / site_password)"
+  value       = local.site_url
+}
+
+output "site_username" {
+  value = var.site_username
 }
 
 output "grafana_url" {
-  value = var.enable_monitoring_stack ? "http://${aws_eip.dashboard.public_ip}:3000" : "monitoring stack disabled"
+  value = var.enable_monitoring_stack ? "${local.site_url}/grafana/" : "monitoring stack disabled"
 }
 
 output "ssh_command" {
-  value = "ssh ec2-user@${aws_eip.dashboard.public_ip}"
+  value = "ssh ec2-user@${local.public_ip}"
 }
 
 output "backup_bucket" {
@@ -21,5 +26,5 @@ output "backup_bucket" {
 
 output "first_boot_log" {
   description = "Follow the installation progress after 'apply'"
-  value       = "ssh ec2-user@${aws_eip.dashboard.public_ip} sudo tail -f /var/log/devops-ai-setup.log"
+  value       = "ssh ec2-user@${local.public_ip} sudo tail -f /var/log/devops-ai-setup.log"
 }

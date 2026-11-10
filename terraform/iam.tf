@@ -33,9 +33,13 @@ data "aws_iam_policy_document" "dashboard" {
   }
 
   statement {
-    sid       = "ReadGeminiKey"
-    actions   = ["ssm:GetParameter"]
-    resources = [aws_ssm_parameter.gemini_key.arn]
+    sid     = "ReadSecrets"
+    actions = ["ssm:GetParameter"]
+    resources = [
+      aws_ssm_parameter.gemini_key.arn,
+      aws_ssm_parameter.github_token.arn,
+      aws_ssm_parameter.site_password.arn,
+    ]
   }
 
   statement {
@@ -62,11 +66,26 @@ resource "aws_iam_instance_profile" "dashboard" {
   role = aws_iam_role.dashboard.name
 }
 
-# The Gemini key is stored encrypted (KMS) and fetched by the instance at boot.
-# Note: Terraform state also contains it - keep terraform.tfstate private.
+# Secrets are stored encrypted (KMS) and fetched by the instance at boot,
+# so they never appear in user-data. Note: Terraform state also contains
+# them - keep terraform.tfstate private.
 resource "aws_ssm_parameter" "gemini_key" {
   name        = "/${var.project}/gemini_api_key"
   description = "Google Gemini API key for the DevOps AI Dashboard"
   type        = "SecureString"
   value       = var.gemini_api_key == "" ? "not-set" : var.gemini_api_key
+}
+
+resource "aws_ssm_parameter" "github_token" {
+  name        = "/${var.project}/github_token"
+  description = "GitHub token (Actions read) for the DevOps AI Dashboard"
+  type        = "SecureString"
+  value       = var.github_token == "" ? "not-set" : var.github_token
+}
+
+resource "aws_ssm_parameter" "site_password" {
+  name        = "/${var.project}/site_password"
+  description = "Password of the public dashboard website"
+  type        = "SecureString"
+  value       = var.site_password
 }
