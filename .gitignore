@@ -28,4 +28,9 @@ terraform/.terraform.lock.hcl
 Thumbs.db
 .vscode/
 .idea/
-!*.tfvars.example) 
+
+# Terraform state and vars anywhere in the repo - state contains secrets
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
