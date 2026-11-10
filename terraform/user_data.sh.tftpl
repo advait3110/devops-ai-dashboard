@@ -72,13 +72,17 @@ PASSWORD_HASH=$(docker run --rm "$CADDY_IMAGE" caddy hash-password --plaintext "
 unset SITE_PASSWORD
 
 cat > /opt/caddy/Caddyfile <<CADDY
-%{ if ip_mode ~}
 {
+	# HTTP/1.1 + HTTP/2 only: browsers hung when they switched to HTTP/3 (QUIC) on this site.
+	servers {
+		protocols h1 h2
+	}
+%{ if ip_mode ~}
 	# Browsers send no server name (SNI) when the URL is an IP address.
 	default_sni ${site_host}
+%{ endif ~}
 }
 
-%{ endif ~}
 ${site_host} {
 %{ if ip_mode ~}
 	# Let's Encrypt issues IP-address certificates only with the 6-day "shortlived" profile;

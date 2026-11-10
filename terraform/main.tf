@@ -100,7 +100,8 @@ resource "aws_instance" "dashboard" {
     delete_on_termination = true
   }
 
-  user_data = templatefile("${path.module}/user_data.sh.tftpl", {
+  # replace() strips Windows line endings (CRLF) - bash on Linux fails on them.
+  user_data = replace(templatefile("${path.module}/user_data.sh.tftpl", {
     repo_url          = var.repo_url
     repo_branch       = var.repo_branch
     region            = var.region
@@ -114,7 +115,7 @@ resource "aws_instance" "dashboard" {
     ip_mode           = var.domain_name == ""
     backup_bucket     = aws_s3_bucket.backups.bucket
     enable_monitoring = var.enable_monitoring_stack
-  })
+  }), "\r\n", "\n")
   user_data_replace_on_change = true
 
   tags = {

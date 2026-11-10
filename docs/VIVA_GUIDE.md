@@ -195,12 +195,27 @@ OK ──(value ≥ threshold for N samples)──► FIRING ──(value < thre
 - **Declarative:** we describe the desired infrastructure; `terraform plan` shows the difference and
   `apply` makes it so. The **state file** records what exists, so the next plan only shows changes.
 - Resources: EC2 (latest Amazon Linux 2023 AMI looked up through SSM, no hard-coded IDs), Elastic IP,
-  security group (SSH/8080 only from your IP), IAM role + instance profile, SSM SecureString for the
-  Gemini key, encrypted/versioned private S3 bucket with lifecycle expiry, CloudWatch alarms + optional SNS e-mail.
+  security group (80/443 public for the website, SSH only from your IP, app port 8088 closed), IAM role +
+  instance profile, SSM SecureStrings for the Gemini key, GitHub token and site password,
+  encrypted/versioned private S3 bucket with lifecycle expiry, CloudWatch alarms + optional SNS e-mail.
+- **Public HTTPS website:** **Caddy** runs in front of the app's Nginx. It obtains a free **Let's Encrypt**
+  certificate automatically (ACME protocol: Let's Encrypt checks the server answers on port 80, then
+  signs the certificate), redirects http to https, renews the certificate itself, and asks for a
+  username/password (HTTP basic auth, bcrypt hash) because the dashboard can start/stop containers.
+  Without a domain the URL is `https://<elastic-ip>`: Let's Encrypt has issued 6-day IP-address
+  certificates since January 2026. The Elastic IP is created *before* the instance (then attached with
+  `aws_eip_association`) so its address can be written into the first-boot script.
+- **Real-world debugging story (good viva answer):** after the first deploy, `curl` got an instant
+  `401` but the browser hung. The response header `Alt-Svc: h3=":443"` showed Caddy was inviting
+  browsers to switch to **HTTP/3 (QUIC over UDP)**, and those connections stalled. Fix: Caddy serves
+  `protocols h1 h2` only. Also fixed on the way: AWS rejects apostrophes in security-group
+  descriptions, and a changing home IP blocks SSH until `allowed_cidr` is updated.
 - **Security choices:** an IAM *role* (temporary credentials) instead of access keys on the server;
   **IMDSv2 required** (protects against SSRF credential theft) with hop limit 2 so the container can
   use the role; the secret is fetched from SSM at boot instead of being written in user-data.
-- **user-data** bootstraps the server: swap, Docker, Compose, clone, `.env`, `docker compose up`, nightly S3 backup cron.
+- **user-data** bootstraps the server: swap, Docker, Compose, clone, secrets from SSM into `.env`, Caddy (HTTPS),
+  `docker compose up`, nightly S3 backup cron.
+- **CI checks the IaC:** GitHub Actions runs `terraform init -backend=false` + `terraform validate` on every push.
 
 ## 14. Frontend design decisions
 
