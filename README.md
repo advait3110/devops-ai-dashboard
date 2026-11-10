@@ -121,4 +121,15 @@ System page.
 
 Run only what the current phase needs and stop the rest (`docker compose stop`, `minikube stop`).
 <img width="1918" height="885" alt="image" src="https://github.com/user-attachments/assets/8d01f365-4be8-4acd-86c1-7e8c27205ce3" />
+<img width="1549" height="768" alt="image" src="https://github.com/user-attachments/assets/cc946aa9-5d0c-4ce2-be17-73d34bcbe386" />
+<img width="1915" height="889" alt="image" src="https://github.com/user-attachments/assets/3198a287-fe46-4f0c-863b-920d99dad947" />
+<img width="1918" height="880" alt="image" src="https://github.com/user-attachments/assets/2e014114-2e9e-4c58-b4a5-0821941f1b51" />
+<img width="1918" height="886" alt="image" src="https://github.com/user-attachments/assets/9a5a7031-ea2b-4d19-bccc-87b034b88210" />
+<img width="1918" height="882" alt="image" src="https://github.com/user-attachments/assets/163734a7-0ecc-41ba-a7a2-e8e70204f20c" />
+<img width="1918" height="888" alt="image" src="https://github.com/user-attachments/assets/21e62c70-9b56-478b-84ea-3d80ee458d73" />
+
+<img width="1917" height="886" alt="image" src="https://github.com/user-attachments/assets/eaed1687-2ef0-420e-aa6a-5ab798a64740" />
+<img width="1915" height="889" alt="image" src="https://github.com/user-attachments/assets/da58ba95-a521-4dc5-8c4f-d50d4f778f83" />
+
+
 
