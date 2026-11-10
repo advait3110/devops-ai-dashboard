@@ -120,3 +120,5 @@ System page.
 | + Minikube (`--memory=2200`) | +2.2 GB |
 
 Run only what the current phase needs and stop the rest (`docker compose stop`, `minikube stop`).
+<img width="1918" height="885" alt="image" src="https://github.com/user-attachments/assets/8d01f365-4be8-4acd-86c1-7e8c27205ce3" />
+
