@@ -29,7 +29,7 @@ resource "aws_key_pair" "this" {
 
 resource "aws_security_group" "dashboard" {
   name        = "${var.project}-sg"
-  description = "DevOps AI Dashboard: public HTTPS site, SSH only from the owner's IP"
+  description = "DevOps AI Dashboard: public HTTPS site, SSH only from the owner IP"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
