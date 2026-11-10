@@ -28,7 +28,11 @@ MEMORY = Gauge("devops_dashboard_host_memory_percent", "Host memory usage measur
 DISK = Gauge("devops_dashboard_host_disk_percent", "Host root disk usage measured by psutil")
 ACTIVE_ALERTS = Gauge("devops_dashboard_active_alerts", "Alerts currently firing", ["severity"])
 AI_REQUESTS = Counter("devops_dashboard_ai_requests_total", "Gemini API calls", ["kind", "outcome"])
-
+# Create the label combinations at 0 so Grafana shows a flat line instead of "No data"
+# until the first AI call happens.
+for _kind in ("chat", "analyze"):
+    for _outcome in ("ok", "error"):
+        AI_REQUESTS.labels(_kind, _outcome)
 
 def update_host_gauges(sample: dict) -> None:
     CPU.set(sample["cpu_percent"])

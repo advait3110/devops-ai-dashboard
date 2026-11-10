@@ -28,7 +28,7 @@ groups:
           summary: "Less than 10% memory available on {{ $labels.instance }}"
 
       - alert: HostDiskAlmostFull
-        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) * 100 < 10
+          expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) * 100 < 10 unless on(instance, device, mountpoint) node_filesystem_readonly == 1
         for: 5m
         labels:
           severity: critical
