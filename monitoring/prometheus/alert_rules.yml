@@ -28,7 +28,8 @@ groups:
           summary: "Less than 10% memory available on {{ $labels.instance }}"
 
       - alert: HostDiskAlmostFull
-          expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) * 100 < 10 unless on(instance, device, mountpoint) node_filesystem_readonly == 1
+        # Read-only filesystems (e.g. WSL2 system images) are always "100 % full", so ignore them.
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"}) * 100 < 10 unless on(instance, device, mountpoint) node_filesystem_readonly == 1
         for: 5m
         labels:
           severity: critical
